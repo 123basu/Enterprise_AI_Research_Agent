@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: enterprise-ai-research-agent
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: false
+    healthCheckPath: /api/health
+    envVars:
+      - key: AI_PROVIDER
+        value: ollama
+      - key: AI_MODEL
+        value: llama3.2:3b
+      # For cloud AI, set these in Render dashboard instead:
+      # - key: AI_PROVIDER
+      #   value: openrouter
+      # - key: OPENROUTER_API_KEY
+      #   sync: false
