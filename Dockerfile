@@ -8,8 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app
 COPY app ./app
-COPY data ./data
-# Ensure data dir exists and is writable (ephemeral on free hosts)
+# Ensure data dir exists and is writable (ephemeral on free hosts - SQLite creates research.db on startup)
 RUN mkdir -p data
 
 EXPOSE 8000
