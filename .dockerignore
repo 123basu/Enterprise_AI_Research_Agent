@@ -7,3 +7,4 @@ __pycache__
 .env
 data/*.db
 data/*.db-journal
+Enterprise_AI_Research_Agent_Architecture_and_Data_Model.pdf
