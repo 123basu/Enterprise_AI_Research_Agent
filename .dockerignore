@@ -8,3 +8,6 @@ __pycache__
 data/*.db
 data/*.db-journal
 Enterprise_AI_Research_Agent_Architecture_and_Data_Model.pdf
+Architecture_Diagram_Document.pdf
+Technical_Documentation.pdf
+Database_Data_Model.pdf
