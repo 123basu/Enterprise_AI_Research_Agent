@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Research Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <p class="eyebrow">Enterprise AI Research Agent · Step 1</p>
+        <h1>Turn a question into traceable evidence.</h1>
+        <p class="lede">A small, inspectable starting point for the research workflow. Ask a question and watch the backend acknowledge every stage.</p>
+      </section>
+      <section class="workspace" aria-label="Research workspace">
+        <form id="research-form" class="question-card">
+          <label for="question">What do you want to research?</label>
+          <textarea id="question" name="question" minlength="10" maxlength="500" placeholder="Example: What are the main benefits and risks of AI-assisted software development?" required></textarea>
+          <div class="form-footer"><span>10–500 characters</span><button type="submit">Start research <span aria-hidden="true">→</span></button></div>
+          <p id="error" class="error" role="alert"></p>
+        </form>
+        <section class="result-card" aria-live="polite">
+          <div class="result-heading"><div><p class="eyebrow">Pipeline status</p><h2 id="result-title">Ready for a question</h2></div><span id="status" class="status">Idle</span></div>
+          <p id="result-message" class="result-message">The first run will return a transparent workflow shell. No external sources or AI models are connected yet.</p>
+          <div class="workflow-panel">
+            <div class="workflow-header"><p class="eyebrow">Workflow state</p><button id="refresh-workflow" type="button">Refresh</button></div>
+            <p id="workflow-summary" class="workflow-summary">Start a run to see durable stage status.</p>
+            <ul id="workflow-list" class="workflow-list"></ul>
+          </div>
+          <button id="details-button" class="details-button" type="button" disabled>Inspect run details</button>
+          <div id="details-panel" class="details-panel" hidden>
+            <p class="eyebrow">Run inspection</p>
+            <p id="details-question" class="details-question"></p>
+            <div id="details-content"></div>
+          </div>
+          <button id="analyze-button" class="analyze-button" type="button" disabled>Analyze question with AI</button>
+          <div id="analysis-panel" class="analysis-panel" hidden>
+            <p class="eyebrow">Research areas</p>
+            <ul id="topic-list" class="topic-list"></ul>
+            <p class="eyebrow sub-question-label">Focused questions</p>
+            <ul id="sub-question-list" class="sub-question-list"></ul>
+          </div>
+          <div id="search-panel" class="search-panel" hidden>
+            <p class="eyebrow">Search approved sources</p>
+            <form id="search-form" class="search-form"><input id="search-query" aria-label="Search query" placeholder="Search for a research topic" required /><button type="submit">Search</button></form>
+            <button id="suggested-search" class="suggested-search" type="button">Search analyzed topics</button>
+            <button id="save-search-results" class="suggested-search" type="button" disabled>Save all candidates</button>
+            <ul id="search-results" class="search-results"></ul>
+          </div>
+          <ol id="stages" class="stages"></ol>
+          <div id="source-panel" class="source-panel" hidden>
+            <p class="eyebrow">Source capture</p>
+            <p class="source-help">Add a source manually so it stays linked to this research run.</p>
+            <form id="source-form" class="source-form">
+              <input id="source-title" placeholder="Source title" aria-label="Source title" required />
+              <input id="source-url" type="url" placeholder="https://example.com/source" aria-label="Source URL" required />
+              <select id="source-type" aria-label="Source type"><option>Article</option><option>Paper</option><option>Report</option><option>Documentation</option></select>
+              <button type="submit">Save source</button>
+            </form>
+            <button id="collect-batch" class="batch-button" type="button" disabled>Collect saved sources</button>
+            <ul id="source-list" class="source-list"></ul>
+            <p class="eyebrow finding-label">Extracted findings</p>
+            <ul id="finding-list" class="finding-list"></ul>
+            <button id="compare-button" class="compare-button" type="button" disabled>Compare evidence</button>
+            <button id="ai-compare-button" class="ai-compare-button" type="button" disabled>AI compare</button>
+            <ul id="comparison-list" class="comparison-list"></ul>
+            <button id="classify-button" class="classify-button" type="button" disabled>Classify findings</button>
+            <button id="conclusion-button" class="conclusion-button" type="button" disabled>Generate conclusion</button>
+            <button id="ai-conclusion-button" class="ai-conclusion-button" type="button" disabled>Generate AI conclusion</button>
+            <div id="conclusion-panel" class="conclusion-panel" hidden>
+              <p class="eyebrow">Traceable conclusion</p>
+              <p id="conclusion-summary"></p>
+              <p id="conclusion-uncertainty" class="uncertainty"></p>
+              <p id="conclusion-provider" class="provider"></p>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script>
+      const form = document.querySelector("#research-form");
+      const question = document.querySelector("#question");
+      const error = document.querySelector("#error");
+      const title = document.querySelector("#result-title");
+      const status = document.querySelector("#status");
+      const message = document.querySelector("#result-message");
+      const stages = document.querySelector("#stages");
+      const refreshWorkflow = document.querySelector("#refresh-workflow");
+      const workflowSummary = document.querySelector("#workflow-summary");
+      const workflowList = document.querySelector("#workflow-list");
+      const detailsButton = document.querySelector("#details-button");
+      const detailsPanel = document.querySelector("#details-panel");
+      const detailsQuestion = document.querySelector("#details-question");
+      const detailsContent = document.querySelector("#details-content");
+      const analyzeButton = document.querySelector("#analyze-button");
+      const analysisPanel = document.querySelector("#analysis-panel");
+      const topicList = document.querySelector("#topic-list");
+      const subQuestionList = document.querySelector("#sub-question-list");
+      const searchPanel = document.querySelector("#search-panel");
+      const searchForm = document.querySelector("#search-form");
+      const searchQuery = document.querySelector("#search-query");
+      const searchResults = document.querySelector("#search-results");
+      const suggestedSearch = document.querySelector("#suggested-search");
+      const saveSearchResults = document.querySelector("#save-search-results");
+      const collectBatch = document.querySelector("#collect-batch");
+      const sourcePanel = document.querySelector("#source-panel");
+      const sourceForm = document.querySelector("#source-form");
+      const sourceList = document.querySelector("#source-list");
+      const compareButton = document.querySelector("#compare-button");
+      const aiCompareButton = document.querySelector("#ai-compare-button");
+      const comparisonList = document.querySelector("#comparison-list");
+      const classifyButton = document.querySelector("#classify-button");
+      const conclusionButton = document.querySelector("#conclusion-button");
+      const aiConclusionButton = document.querySelector("#ai-conclusion-button");
+      const conclusionPanel = document.querySelector("#conclusion-panel");
+      const conclusionSummary = document.querySelector("#conclusion-summary");
+      const conclusionUncertainty = document.querySelector("#conclusion-uncertainty");
+      const conclusionProvider = document.querySelector("#conclusion-provider");
+      let currentRunId;
+      let latestSearchResults = [];
+      function renderSearchResults(results) {
+        latestSearchResults = results;
+        saveSearchResults.disabled = results.length === 0;
+        searchResults.innerHTML = "";
+        if (results.length === 0) {
+          const empty = document.createElement("li");
+          empty.textContent = "No candidates. Try manual search with a short query like 'ocean acidification'.";
+          searchResults.append(empty);
+          return;
+        }
+        results.forEach((source) => {
+          const item = document.createElement("li");
+          const link = document.createElement("a");
+          link.href = source.url; link.target = "_blank"; link.rel = "noreferrer"; link.textContent = source.title;
+          const snippet = document.createElement("p"); snippet.textContent = source.snippet;
+          const use = document.createElement("button"); use.type = "button"; use.textContent = "Use source";
+          use.addEventListener("click", () => { document.querySelector("#source-title").value = source.title; document.querySelector("#source-url").value = source.url; });
+          item.append(link, snippet, use); searchResults.append(item);
+        });
+      }
+      async function searchSuggested() {
+        suggestedSearch.disabled = true;
+        suggestedSearch.textContent = "Searching analyzed topics...";
+        error.textContent = "";
+        try {
+          const response = await fetch(`/api/research-runs/${currentRunId}/search-suggested`, { method: "POST" });
+          const result = await response.json();
+          if (!response.ok) { error.textContent = result.detail || "Suggested search failed."; suggestedSearch.textContent = "Retry suggested search"; return; }
+          renderSearchResults(result.results);
+          searchQuery.value = result.queries[0] || "";
+          if (result.results.length === 0) {
+            error.textContent = "No candidates found for analyzed topics. Try a shorter manual search like 'ocean acidification' or 'coral reef'.";
+            suggestedSearch.textContent = "0 candidates found - try manual search";
+          } else {
+            suggestedSearch.textContent = `${result.results.length} candidates found`;
+          }
+        } catch (e) {
+          error.textContent = "Search failed: " + (e.message || "network error") + ". Check your connection and try manual search.";
+          suggestedSearch.textContent = "Retry suggested search";
+        } finally {
+          suggestedSearch.disabled = false;
+        }
+      }
+      suggestedSearch.addEventListener("click", searchSuggested);
+      saveSearchResults.addEventListener("click", async () => {
+        saveSearchResults.disabled = true;
+        const response = await fetch(`/api/research-runs/${currentRunId}/sources/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sources: latestSearchResults.slice(0, 10).map((source) => ({ title: source.title, url: source.url, source_type: "Article" })) }) });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "Candidates could not be saved."; saveSearchResults.disabled = false; return; }
+        saveSearchResults.textContent = `${result.sources.length} candidates saved`;
+        collectBatch.disabled = false;
+        await loadWorkflow();
+      });
+      collectBatch.addEventListener("click", async () => {
+        collectBatch.disabled = true;
+        collectBatch.textContent = "Collecting batch...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/sources/collect-batch`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "Source batch collection failed."; collectBatch.disabled = false; return; }
+        const collected = result.results.filter((item) => item.status === "collected" || item.status === "already_collected").length;
+        collectBatch.textContent = `${collected} sources collected`;
+        await loadWorkflow();
+      });
+      async function loadWorkflow() {
+        if (!currentRunId) return;
+        const response = await fetch(`/api/research-runs/${currentRunId}/workflow`);
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "Workflow status could not be loaded."; return; }
+        workflowSummary.textContent = `${result.complete_stages} of ${result.total_stages} stages complete`;
+        workflowList.innerHTML = "";
+        result.stages.forEach((stage) => { const item = document.createElement("li"); item.className = stage.status; item.textContent = `${stage.status === "complete" ? "✓" : "○"} ${stage.name}`; workflowList.append(item); });
+      }
+      refreshWorkflow.addEventListener("click", loadWorkflow);
+      detailsButton.addEventListener("click", async () => {
+        detailsButton.disabled = true;
+        detailsButton.textContent = "Loading details...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/details`);
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "Run details could not be loaded."; detailsButton.disabled = false; return; }
+        detailsQuestion.textContent = result.question;
+        detailsContent.innerHTML = "";
+        const sections = [["Sources", result.sources, (source) => `${source.title} · ${source.fetch_status} · ${source.content_length || 0} chars`], ["Findings", result.findings, (finding) => `${finding.statement} · ${finding.classification} · evidence ${finding.start_char}–${finding.end_char}`], ["Comparisons", result.comparisons, (comparison) => `${comparison.relationship}: ${comparison.rationale}`]];
+        sections.forEach(([heading, items, label]) => {
+          const section = document.createElement("section");
+          const title = document.createElement("h3"); title.textContent = heading; section.append(title);
+          const list = document.createElement("ul"); list.className = "detail-list";
+          items.forEach((item) => { const row = document.createElement("li"); row.textContent = label(item); if (item.content_preview) { const preview = document.createElement("small"); preview.textContent = item.content_preview; row.append(preview); } list.append(row); });
+          if (!items.length) { const empty = document.createElement("p"); empty.textContent = "None yet."; section.append(empty); } else section.append(list);
+          detailsContent.append(section);
+        });
+        if (result.conclusion) { const conclusion = document.createElement("p"); conclusion.textContent = `${result.conclusion.summary} ${result.conclusion.uncertainty}`; detailsContent.append(conclusion); }
+        detailsPanel.hidden = false;
+        detailsButton.textContent = "Refresh run details";
+        detailsButton.disabled = false;
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        error.textContent = "";
+        status.textContent = "Running";
+        status.className = "status running";
+        title.textContent = "Starting workflow...";
+        try {
+          const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: question.value.trim() }) });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail?.[0]?.msg || "The question could not be submitted.");
+          title.textContent = `Workflow shell connected · Run #${data.run_id}`;
+          currentRunId = data.run_id;
+          detailsButton.disabled = false;
+          await loadWorkflow();
+          analyzeButton.disabled = false;
+          sourcePanel.hidden = false;
+          aiConclusionButton.disabled = true;
+          status.textContent = "Scaffold ready";
+          status.className = "status ready";
+          message.textContent = data.message;
+          stages.innerHTML = data.stages.map((stage) => `<li>${stage}</li>`).join("");
+        } catch (requestError) {
+          status.textContent = "Error";
+          status.className = "status error-status";
+          title.textContent = "Unable to start workflow";
+          error.textContent = requestError.message;
+        }
+      });
+      analyzeButton.addEventListener("click", async () => {
+        analyzeButton.disabled = true;
+        analyzeButton.textContent = "Analyzing...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/analyze-question`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "The question could not be analyzed."; analyzeButton.disabled = false; analyzeButton.textContent = "Retry analysis"; return; }
+        topicList.innerHTML = "";
+        result.topics.forEach((topic) => { const item = document.createElement("li"); item.textContent = topic.topic; topicList.append(item); });
+        subQuestionList.innerHTML = "";
+        result.sub_questions.forEach((subQuestion) => { const item = document.createElement("li"); item.textContent = subQuestion; subQuestionList.append(item); });
+        analysisPanel.hidden = false;
+        searchPanel.hidden = false;
+        analyzeButton.textContent = `Analyzed with ${result.provider}`;
+        await searchSuggested();
+      });
+      searchForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const response = await fetch(`/api/research-runs/${currentRunId}/search`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: searchQuery.value.trim() }) });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "The source search failed."; return; }
+        renderSearchResults(result.results);
+      });
+      sourceForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const source = { title: document.querySelector("#source-title").value.trim(), url: document.querySelector("#source-url").value.trim(), source_type: document.querySelector("#source-type").value };
+        const response = await fetch(`/api/research-runs/${currentRunId}/sources`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source) });
+        const data = await response.json();
+        if (!response.ok) { error.textContent = data.detail?.[0]?.msg || "The source could not be saved."; return; }
+        if (data.source.duplicate) { error.textContent = "This source is already saved for this run."; sourceForm.reset(); collectBatch.disabled = false; return; }
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = data.source.url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = data.source.title;
+        const type = document.createElement("span");
+        type.textContent = data.source.source_type;
+        item.append(link, type);
+        const collect = document.createElement("button");
+        collect.type = "button";
+        collect.textContent = "Collect";
+          collect.addEventListener("click", async () => {
+          collect.disabled = true;
+          collect.textContent = "Collecting...";
+          const response = await fetch(`/api/research-runs/${currentRunId}/sources/${data.source.id}/collect`, { method: "POST" });
+          const result = await response.json();
+          if (!response.ok) { error.textContent = result.detail || "The source could not be collected."; collect.disabled = false; collect.textContent = "Retry"; return; }
+          collect.textContent = `${result.characters.toLocaleString()} chars saved`;
+          await loadWorkflow();
+          const extract = document.createElement("button");
+          extract.type = "button";
+          extract.textContent = "Extract findings";
+          extract.addEventListener("click", async () => {
+            extract.disabled = true;
+            extract.textContent = "Extracting...";
+            const response = await fetch(`/api/research-runs/${currentRunId}/sources/${data.source.id}/extract`, { method: "POST" });
+            const result = await response.json();
+            if (!response.ok) { error.textContent = result.detail || "Findings could not be extracted."; extract.disabled = false; extract.textContent = "Retry extraction"; return; }
+          extract.textContent = `${result.findings.length} findings saved`;
+          await loadWorkflow();
+          classifyButton.disabled = false;
+          compareButton.disabled = false;
+          aiCompareButton.disabled = false;
+            result.findings.filter((finding) => finding.source_id === data.source.id).forEach((finding) => {
+              const findingItem = document.createElement("li");
+              const statement = document.createElement("strong");
+              statement.textContent = finding.statement;
+              const evidence = document.createElement("small");
+              evidence.textContent = `Evidence span: characters ${finding.start_char}–${finding.end_char} · ${finding.classification || "unclassified"}`;
+              findingItem.append(statement, evidence);
+              document.querySelector("#finding-list").append(findingItem);
+            });
+          });
+          item.append(extract);
+          const aiExtract = document.createElement("button");
+          aiExtract.type = "button";
+          aiExtract.textContent = "AI extract";
+          aiExtract.addEventListener("click", async () => {
+            aiExtract.disabled = true;
+            aiExtract.textContent = "Asking AI...";
+            const response = await fetch(`/api/research-runs/${currentRunId}/sources/${data.source.id}/ai-extract`, { method: "POST" });
+            const result = await response.json();
+            if (!response.ok) { error.textContent = result.detail || "AI findings could not be extracted."; aiExtract.disabled = false; aiExtract.textContent = "Retry AI extract"; return; }
+            aiExtract.textContent = `${result.findings.length} AI findings saved`;
+          });
+          item.append(aiExtract);
+        });
+        item.append(collect);
+        sourceList.append(item);
+        collectBatch.disabled = false;
+        await loadWorkflow();
+        sourceForm.reset();
+      });
+      conclusionButton.addEventListener("click", async () => {
+        conclusionButton.disabled = true;
+        conclusionButton.textContent = "Generating...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/conclude`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "The conclusion could not be generated."; conclusionButton.disabled = false; conclusionButton.textContent = "Retry conclusion"; return; }
+        conclusionSummary.textContent = result.conclusion.summary;
+        conclusionUncertainty.textContent = result.conclusion.uncertainty;
+        conclusionPanel.hidden = false;
+        conclusionButton.textContent = "Conclusion saved";
+        await loadWorkflow();
+      });
+      compareButton.addEventListener("click", async () => {
+        compareButton.disabled = true;
+        compareButton.textContent = "Comparing...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/compare`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "Evidence could not be compared."; compareButton.disabled = false; compareButton.textContent = "Retry comparison"; return; }
+        comparisonList.innerHTML = "";
+        result.comparisons.forEach((comparison) => {
+          const item = document.createElement("li");
+          item.className = comparison.relationship === "potential_contradiction" ? "contradiction" : "";
+          item.textContent = `${comparison.relationship}: ${comparison.rationale}`;
+          comparisonList.append(item);
+        });
+        compareButton.textContent = `${result.comparisons.length} comparisons saved`;
+        await loadWorkflow();
+      });
+      aiCompareButton.addEventListener("click", async () => {
+        aiCompareButton.disabled = true;
+        aiCompareButton.textContent = "Asking AI...";
+        error.textContent = "";
+        try {
+          const response = await fetch(`/api/research-runs/${currentRunId}/ai-compare`, { method: "POST" });
+          const result = await response.json();
+          if (!response.ok) {
+            if (result.detail && result.detail.includes("invalid comparison response")) {
+              error.textContent = result.detail + " Tip: Try again, or use 'Compare evidence' (non-AI) as fallback. Small Ollama models sometimes return bad JSON.";
+            } else {
+              error.textContent = result.detail || "AI comparison failed.";
+            }
+            aiCompareButton.disabled = false; aiCompareButton.textContent = "Retry AI compare"; return;
+          }
+        comparisonList.innerHTML = "";
+        result.comparisons.forEach((comparison) => {
+          const item = document.createElement("li");
+          item.className = comparison.relationship === "contradicts" ? "contradiction" : "";
+          item.textContent = `${comparison.relationship}: ${comparison.rationale}`;
+          comparisonList.append(item);
+        });
+        aiCompareButton.textContent = `${result.comparisons.length} AI comparisons saved`;
+        await loadWorkflow();
+        } catch (e) {
+          error.textContent = "AI compare network error: " + (e.message || "try again");
+          aiCompareButton.disabled = false; aiCompareButton.textContent = "Retry AI compare";
+        }
+      });
+      classifyButton.addEventListener("click", async () => {
+        classifyButton.disabled = true;
+        classifyButton.textContent = "Classifying...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/classify`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "Findings could not be classified."; classifyButton.disabled = false; classifyButton.textContent = "Retry classification"; return; }
+        classifyButton.textContent = `${result.findings.length} findings classified`;
+        conclusionButton.disabled = false;
+        await loadWorkflow();
+         aiConclusionButton.disabled = false;
+        document.querySelectorAll("#finding-list small").forEach((element, index) => {
+          const finding = result.findings[index];
+          if (finding) element.textContent = `Evidence span: characters ${finding.start_char}–${finding.end_char} · ${finding.classification} · confidence ${finding.confidence}`;
+        });
+      });
+      aiConclusionButton.addEventListener("click", async () => {
+        aiConclusionButton.disabled = true;
+        aiConclusionButton.textContent = "Asking AI...";
+        const response = await fetch(`/api/research-runs/${currentRunId}/ai-conclude`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) { error.textContent = result.detail || "The AI conclusion could not be generated."; aiConclusionButton.disabled = false; aiConclusionButton.textContent = "Retry AI conclusion"; return; }
+        conclusionSummary.textContent = result.conclusion.summary;
+        conclusionUncertainty.textContent = result.conclusion.uncertainty;
+        conclusionProvider.textContent = `Generated with ${result.conclusion.provider} · ${result.conclusion.model}`;
+        conclusionPanel.hidden = false;
+        aiConclusionButton.textContent = "AI conclusion saved";
+        await loadWorkflow();
+      });
+    </script>
+  </body>
+</html>
