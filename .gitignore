@@ -3,3 +3,6 @@ __pycache__/
 *.py[cod]
 .env
 data/
+
+.gitignore
+ai-context.md
